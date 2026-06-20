@@ -1,0 +1,62 @@
+@InfoTrack.SolicitorScraper.Api_HostAddress = https://localhost:5001
+
+### Locations — get configured list
+GET {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/locations
+Accept: application/json
+
+###
+
+### Locations — update list
+PUT {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/locations
+Content-Type: application/json
+
+{
+  "locations": [
+    "London",
+    "Birmingham",
+    "Leeds",
+    "Manchester",
+    "Sheffield",
+    "Bradford",
+    "Liverpool",
+    "Bristol"
+  ]
+}
+
+###
+
+### Scrape — all configured locations
+POST {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/scrape
+Content-Type: application/json
+
+{}
+
+###
+
+### Scrape — selected locations only
+POST {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/scrape
+Content-Type: application/json
+
+{
+  "locations": ["London", "Liverpool"]
+}
+
+###
+
+### Solicitors — all stored contacts
+GET {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/solicitors
+Accept: application/json
+
+###
+
+### Solicitors — filter by locations
+GET {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/solicitors?locations=London,Liverpool
+Accept: application/json
+
+###
+
+### Report — summary
+GET {{InfoTrack.SolicitorScraper.Api_HostAddress}}/api/reports/summary
+Accept: application/json
+
+###

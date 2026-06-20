@@ -1,0 +1,30 @@
+<div class="kpi-card @VariantClass">
+    <div class="kpi-label">@Label</div>
+    <div class="kpi-value">@Value</div>
+    @if (!string.IsNullOrWhiteSpace(Subtitle))
+    {
+        <div class="kpi-subtitle">@Subtitle</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter]
+    public string Variant { get; set; } = "default";
+
+    private string VariantClass => Variant switch
+    {
+        "success" => "kpi-success",
+        "warning" => "kpi-warning",
+        "danger" => "kpi-danger",
+        _ => string.Empty
+    };
+}

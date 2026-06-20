@@ -1,0 +1,134 @@
+@page "/report"
+@using System.Globalization
+@inject IReportsApiClient ReportsApi
+
+<PageTitle>Report</PageTitle>
+
+<div class="page-header report-header">
+    <div>
+        <h1>Sales pipeline report</h1>
+        <p class="page-subtitle">
+            Executive summary of scraped conveyancing solicitors and top prospects for the sales team.
+        </p>
+    </div>
+</div>
+
+@if (loading)
+{
+    <LoadingPanel Text="Building report..." />
+}
+else if (errorMessage is not null)
+{
+    <AlertMessage Message="@errorMessage" Type="AlertMessage.AlertType.Error" />
+}
+else if (summary is not null)
+{
+    <section class="kpi-grid">
+        <KpiCard Label="Total prospects"
+                 Value="@summary.TotalSolicitors.ToString("N0")"
+                 Subtitle="Solicitors stored across all locations" />
+
+        <KpiCard Label="Locations covered"
+                 Value="@($"{LocationsWithData} / {ConfiguredLocations}")"
+                 Subtitle="@CoverageSubtitle"
+                 Variant="@(summary.CoverageGaps.Count == 0 ? "success" : "warning")" />
+
+        <KpiCard Label="Last scraped"
+                 Value="@LastScrapedLabel"
+                 Subtitle="@LastScrapedSubtitle" />
+
+        <KpiCard Label="Callable records"
+                 Value="@($"{CallableCount} ({PhoneRate:0.#}%)")"
+                 Subtitle="@($"{summary.SolicitorsWithoutPhone} missing phone")"
+                 Variant="@PhoneRateVariant" />
+    </section>
+
+    <section class="card">
+        <h2>Prospects by location</h2>
+        <p class="section-intro">Compare market size across cities to prioritise regional outreach.</p>
+        <LocationDistributionChart Items="@summary.ByLocation" />
+    </section>
+
+    <section class="card page-wide-card">
+        <h2>Top prospects by review count</h2>
+        <p class="section-intro">
+            Firms with the highest review counts may have stronger market presence - useful for prioritising InfoTrack outreach.
+        </p>
+
+        @if (summary.TopByReviewCount.Count == 0)
+        {
+            <p class="empty-state">No review data available in the current dataset.</p>
+        }
+        else
+        {
+            <SolicitorContactTable Contacts="@summary.TopByReviewCount" />
+        }
+    </section>
+}
+
+@code {
+    private SolicitorReportSummary? summary;
+    private bool loading = true;
+    private string? errorMessage;
+
+    private int LocationsWithData => summary?.ByLocation.Count(x => x.Count > 0) ?? 0;
+    private int ConfiguredLocations => summary?.ByLocation.Count ?? 0;
+    private int CallableCount => summary is null ? 0 : summary.TotalSolicitors - summary.SolicitorsWithoutPhone;
+
+    private double PhoneRate => summary is { TotalSolicitors: > 0 }
+        ? CallableCount * 100.0 / summary.TotalSolicitors
+        : 0;
+
+    private string PhoneRateVariant => PhoneRate switch
+    {
+        >= 90 => "success",
+        >= 70 => "warning",
+        _ => "danger"
+    };
+
+    private string CoverageSubtitle => summary?.CoverageGaps.Count == 0
+        ? "Full geographic coverage"
+        : $"{summary!.CoverageGaps.Count} location(s) need scraping";
+
+    private static readonly CultureInfo EnglishCulture = CultureInfo.GetCultureInfo("en-GB");
+
+    private string LastScrapedLabel => summary?.LastScrapedDate is null
+        ? "Never"
+        : summary.LastScrapedDate.Value.ToLocalTime().ToString("dd MMM yyyy", EnglishCulture);
+
+    private string LastScrapedSubtitle => summary?.LastScrapedDate is null
+        ? "Run a scrape to populate data"
+        : summary.LastScrapedDate.Value.ToLocalTime().ToString("HH:mm", EnglishCulture);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        errorMessage = null;
+
+        try
+        {
+            summary = await ReportsApi.GetSummaryAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = GetErrorMessage(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private static string GetErrorMessage(Exception ex) =>
+        ex switch
+        {
+            ApiException apiEx => apiEx.Message,
+            HttpRequestException => "Could not reach the API. Make sure InfoTrack.SolicitorScraper.Api is running on https://localhost:5001.",
+            _ => ex.Message
+        };
+}

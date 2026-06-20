@@ -1,0 +1,33 @@
+@if (Items.Count == 0)
+{
+    <p class="empty-state">No location data available.</p>
+}
+else
+{
+    <div class="bar-chart">
+        @foreach (var item in Items)
+        {
+            var percentage = MaxCount > 0 ? (item.Count * 100.0 / MaxCount) : 0;
+            var share = TotalCount > 0 ? (item.Count * 100.0 / TotalCount) : 0;
+
+            <div class="bar-row">
+                <div class="bar-label">@item.Location</div>
+                <div class="bar-track">
+                    <div class="bar-fill" style="width: @(percentage.ToString("0.##"))%"></div>
+                </div>
+                <div class="bar-meta">
+                    <strong>@item.Count</strong>
+                    <span>@share.ToString("0.#")%</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<LocationCount> Items { get; set; } = [];
+
+    private int MaxCount => Items.Count == 0 ? 0 : Items.Max(x => x.Count);
+    private int TotalCount => Items.Sum(x => x.Count);
+}

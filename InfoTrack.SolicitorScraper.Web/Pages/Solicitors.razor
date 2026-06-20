@@ -1,0 +1,205 @@
+@page "/solicitors"
+@inject ISolicitorsApiClient SolicitorsApi
+@inject ILocationsApiClient LocationsApi
+
+<PageTitle>Solicitors</PageTitle>
+
+<div class="page-header">
+    <h1>Solicitors</h1>
+    <p class="page-subtitle">
+        Browse scraped solicitor contact details. Filter by location or search by name.
+    </p>
+</div>
+
+@if (loading)
+{
+    <LoadingPanel Text="Loading solicitors..." />
+}
+else
+{
+    @if (errorMessage is not null)
+    {
+        <AlertMessage Message="@errorMessage" Type="AlertMessage.AlertType.Error" />
+    }
+
+    <section class="card">
+        <h2>Filters</h2>
+
+        @if (availableLocations.Count == 0)
+        {
+            <p class="empty-state">
+                No locations configured.
+                <NavLink href="/locations">Add locations</NavLink> before scraping.
+            </p>
+        }
+        else
+        {
+            <div class="filter-grid">
+                @foreach (var location in availableLocations)
+                {
+                    <label class="filter-chip">
+                        <input type="checkbox"
+                               checked="@selectedLocations.Contains(location)"
+                               @onchange="e => ToggleLocation(location, e)" />
+                        <span>@location</span>
+                    </label>
+                }
+            </div>
+
+            <div class="actions-row">
+                <button type="button" class="btn btn-secondary btn-sm" @onclick="SelectAllLocations">Select all</button>
+                <button type="button" class="btn btn-secondary btn-sm" @onclick="ClearLocationSelection">Clear</button>
+            </div>
+        }
+
+        <div class="form-row filter-search-row">
+            <input class="form-control"
+                   placeholder="Search by name..."
+                   @bind="searchTerm"
+                   @bind:event="oninput" />
+            <button type="button" class="btn btn-primary" @onclick="ApplyFiltersAsync" disabled="@loadingResults">
+                @(loadingResults ? "Loading..." : "Apply")
+            </button>
+        </div>
+
+        <p class="results-summary">
+            Showing <strong>@filteredContacts.Count</strong>
+            of <strong>@contacts.Count</strong> loaded contact@(contacts.Count == 1 ? "" : "s").
+        </p>
+    </section>
+
+    <section class="card page-wide-card">
+        <h2>Contact details</h2>
+
+        @if (contacts.Count == 0)
+        {
+            <p class="empty-state">
+                No solicitors stored yet. Go to <NavLink href="/locations">Locations</NavLink> and click
+                <strong>Scrape</strong> to load data, then return here.
+            </p>
+        }
+        else
+        {
+            <SolicitorContactTable Contacts="@filteredContacts" />
+        }
+    </section>
+}
+
+@code {
+    private readonly List<SolicitorContact> contacts = [];
+    private readonly List<string> availableLocations = [];
+    private readonly HashSet<string> selectedLocations = new(StringComparer.OrdinalIgnoreCase);
+
+    private string searchTerm = string.Empty;
+    private bool loading = true;
+    private bool loadingResults;
+    private string? errorMessage;
+
+    private IReadOnlyList<SolicitorContact> filteredContacts =>
+        string.IsNullOrWhiteSpace(searchTerm)
+            ? contacts
+            : contacts
+                .Where(c => c.Name.Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        loading = true;
+        errorMessage = null;
+
+        try
+        {
+            var locations = await LocationsApi.GetAsync();
+            availableLocations.Clear();
+            availableLocations.AddRange(locations);
+
+            if (selectedLocations.Count == 0)
+            {
+                foreach (var location in locations)
+                {
+                    selectedLocations.Add(location);
+                }
+            }
+
+            await FetchSolicitorsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = GetErrorMessage(ex);
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        loadingResults = true;
+        errorMessage = null;
+
+        try
+        {
+            await FetchSolicitorsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = GetErrorMessage(ex);
+        }
+        finally
+        {
+            loadingResults = false;
+        }
+    }
+
+    private async Task FetchSolicitorsAsync()
+    {
+        IReadOnlyList<string>? locationFilter = selectedLocations.Count > 0
+            ? selectedLocations.ToList()
+            : null;
+
+        var results = await SolicitorsApi.GetAsync(locationFilter);
+        contacts.Clear();
+        contacts.AddRange(results.OrderBy(c => c.Location).ThenBy(c => c.Name));
+    }
+
+    private void ToggleLocation(string location, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool checkedValue && checkedValue;
+        if (isChecked)
+        {
+            selectedLocations.Add(location);
+        }
+        else
+        {
+            selectedLocations.Remove(location);
+        }
+    }
+
+    private void SelectAllLocations()
+    {
+        selectedLocations.Clear();
+        foreach (var location in availableLocations)
+        {
+            selectedLocations.Add(location);
+        }
+    }
+
+    private void ClearLocationSelection()
+    {
+        selectedLocations.Clear();
+    }
+
+    private static string GetErrorMessage(Exception ex) =>
+        ex switch
+        {
+            ApiException apiEx => apiEx.Message,
+            HttpRequestException => "Could not reach the API. Make sure InfoTrack.SolicitorScraper.Api is running on https://localhost:5001.",
+            _ => ex.Message
+        };
+}

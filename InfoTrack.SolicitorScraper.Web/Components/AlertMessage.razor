@@ -1,0 +1,26 @@
+@if (Message is not null)
+{
+    <div class="alert @CssClass" role="alert">@Message</div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public AlertType Type { get; set; } = AlertType.Info;
+
+    private string CssClass => Type switch
+    {
+        AlertType.Success => "alert-success",
+        AlertType.Error => "alert-error",
+        _ => "alert-info"
+    };
+
+    public enum AlertType
+    {
+        Info,
+        Success,
+        Error
+    }
+}

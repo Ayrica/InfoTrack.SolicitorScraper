@@ -1,0 +1,70 @@
+@if (Contacts.Count == 0){
+    <p class="empty-state">No solicitors match the current filters.</p>
+}
+else
+{
+    <div class="table-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Location</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                    <th>Reviews</th>
+                    <th>Links</th>
+                    <th>Scraped</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var contact in Contacts)
+                {
+                    <tr>
+                        <td>
+                            <div class="contact-name">@contact.Name</div>
+                            @if (!string.IsNullOrWhiteSpace(contact.Description))
+                            {
+                                <div class="contact-description">@contact.Description</div>
+                            }
+                        </td>
+                        <td>@contact.Location</td>
+                        <td>@(string.IsNullOrWhiteSpace(contact.Phone) ? "—" : contact.Phone)</td>
+                        <td>@(string.IsNullOrWhiteSpace(contact.Address) ? "—" : contact.Address)</td>
+                        <td>@(contact.ReviewCount?.ToString() ?? "—")</td>
+                        <td>
+                            <div class="link-group">
+                                @if (!string.IsNullOrWhiteSpace(contact.WebsiteUrl))
+                                {
+                                    <a href="@contact.WebsiteUrl" target="_blank" rel="noopener noreferrer">Website</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(contact.EmailUrl))
+                                {
+                                    <a href="@contact.EmailUrl" target="_blank" rel="noopener noreferrer">Email</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(contact.ProfileUrl))
+                                {
+                                    <a href="@contact.ProfileUrl" target="_blank" rel="noopener noreferrer">Profile</a>
+                                }
+                                @if (string.IsNullOrWhiteSpace(contact.WebsiteUrl)
+                                    && string.IsNullOrWhiteSpace(contact.EmailUrl)
+                                    && string.IsNullOrWhiteSpace(contact.ProfileUrl))
+                                {
+                                    <span>—</span>
+                                }
+                            </div>
+                        </td>
+                        <td class="nowrap">@contact.ScrapedDate.ToLocalTime().ToString("g", EnglishCulture)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo EnglishCulture =
+        System.Globalization.CultureInfo.GetCultureInfo("en-GB");
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<SolicitorContact> Contacts { get; set; } = [];
+}

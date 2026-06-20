@@ -1,0 +1,608 @@
+@page "/locations"
+
+@inject ILocationsApiClient LocationsApi
+
+@inject IScrapeApiClient ScrapeApi
+
+
+
+<PageTitle>Locations</PageTitle>
+
+
+
+<div class="page-header">
+
+    <h1>Locations</h1>
+
+    <p class="page-subtitle">
+
+        Manage the list of locations used when scraping conveyancing solicitors from solicitors.com.
+
+    </p>
+
+</div>
+
+
+
+@if (loading)
+
+{
+
+    <LoadingPanel Text="Loading locations..." />
+
+}
+
+else
+
+{
+
+    @if (errorMessage is not null)
+
+    {
+
+        <AlertMessage Message="@errorMessage" Type="AlertMessage.AlertType.Error" />
+
+    }
+
+
+
+    @if (successMessage is not null)
+
+    {
+
+        <AlertMessage Message="@successMessage" Type="AlertMessage.AlertType.Success" />
+
+    }
+
+
+
+    @if (warningMessage is not null)
+
+    {
+
+        <AlertMessage Message="@warningMessage" Type="AlertMessage.AlertType.Info" />
+
+    }
+
+
+
+    <section class="card">
+
+        <h2>Configured locations</h2>
+
+
+
+        @if (locations.Count == 0)
+
+        {
+
+            <p class="empty-state">No locations configured. Add at least one location below.</p>
+
+        }
+
+        else
+
+        {
+
+            <ul class="location-list">
+
+                @for (var i = 0; i < locations.Count; i++)
+
+                {
+
+                    var index = i;
+
+                    <li class="location-item">
+
+                        <span>@locations[index]</span>
+
+                        <button type="button" class="btn btn-danger btn-sm" @onclick="() => RemoveLocation(index)" disabled="@isBusy">
+
+                            Remove
+
+                        </button>
+
+                    </li>
+
+                }
+
+            </ul>
+
+        }
+
+    </section>
+
+
+
+    <section class="card">
+
+        <h2>Add location</h2>
+
+        <div class="form-row">
+
+            <input class="form-control"
+
+                   placeholder="e.g. London"
+
+                   @bind="newLocation"
+
+                   @bind:event="oninput"
+
+                   @onkeydown="HandleKeyDown"
+
+                   disabled="@isBusy" />
+
+            <button type="button" class="btn btn-secondary" @onclick="AddLocation" disabled="@(isBusy || string.IsNullOrWhiteSpace(newLocation))">
+
+                Add
+
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    @if (scraping)
+
+    {
+
+        <LoadingPanel Text="@scrapeLoadingMessage" />
+
+    }
+
+
+
+    <section class="actions-row">
+
+        <button type="button" class="btn btn-primary" @onclick="SaveAsync" disabled="@isBusy">
+
+            @(saving ? "Saving..." : "Save")
+
+        </button>
+
+        <button type="button" class="btn btn-secondary" @onclick="ScrapeAsync" disabled="@isBusy">
+
+            @(scraping ? "Scraping..." : "Scrape")
+
+        </button>
+
+        <button type="button" class="btn btn-secondary" @onclick="ResetToDefaults" disabled="@isBusy">
+
+            Reset
+
+        </button>
+
+    </section>
+
+
+
+    @if (scrapeSuccessMessage is not null)
+
+    {
+
+        <p class="scrape-next-steps">
+
+            Browse the <NavLink href="/solicitors">solicitors list</NavLink>
+
+            or view the <NavLink href="/report">summary report</NavLink>.
+
+        </p>
+
+    }
+
+}
+
+
+
+@code {
+
+    private readonly List<string> locations = [];
+
+    private string newLocation = string.Empty;
+
+    private bool loading = true;
+
+    private bool saving;
+
+    private bool scraping;
+
+    private string? errorMessage;
+
+    private string? successMessage;
+
+    private string? warningMessage;
+
+    private string? scrapeSuccessMessage;
+
+    private string scrapeLoadingMessage = "Scraping saved locations... This may take several minutes.";
+
+
+
+    private bool isBusy => saving || scraping;
+
+
+
+    protected override async Task OnInitializedAsync()
+
+    {
+
+        await LoadAsync();
+
+    }
+
+
+
+    private async Task LoadAsync()
+
+    {
+
+        loading = true;
+
+        ClearMessages();
+
+
+
+        try
+
+        {
+
+            var result = await LocationsApi.GetAsync();
+
+            locations.Clear();
+
+            locations.AddRange(result);
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            errorMessage = GetErrorMessage(ex);
+
+        }
+
+        finally
+
+        {
+
+            loading = false;
+
+        }
+
+    }
+
+
+
+    private void AddLocation()
+
+    {
+
+        ClearMessages();
+
+
+
+        var trimmed = newLocation.Trim();
+
+        if (string.IsNullOrWhiteSpace(trimmed))
+
+        {
+
+            errorMessage = "Location name cannot be empty.";
+
+            return;
+
+        }
+
+
+
+        if (locations.Any(x => string.Equals(x, trimmed, StringComparison.OrdinalIgnoreCase)))
+
+        {
+
+            errorMessage = $"'{trimmed}' is already in the list.";
+
+            return;
+
+        }
+
+
+
+        locations.Add(trimmed);
+
+        newLocation = string.Empty;
+
+    }
+
+
+
+    private void RemoveLocation(int index)
+
+    {
+
+        ClearMessages();
+
+        locations.RemoveAt(index);
+
+    }
+
+
+
+    private void ResetToDefaults()
+
+    {
+
+        ClearMessages();
+
+        locations.Clear();
+
+        locations.AddRange(DefaultLocations.All);
+
+        successMessage = "Reset to default locations. Click Save to persist.";
+
+    }
+
+
+
+    private async Task SaveAsync()
+
+    {
+
+        if (!TryValidateLocations())
+
+        {
+
+            return;
+
+        }
+
+
+
+        saving = true;
+
+        ClearMessages();
+
+
+
+        try
+
+        {
+
+            await PersistLocationsAsync();
+
+            successMessage = "Locations saved successfully.";
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            errorMessage = GetErrorMessage(ex);
+
+        }
+
+        finally
+
+        {
+
+            saving = false;
+
+        }
+
+    }
+
+
+
+    private async Task ScrapeAsync()
+
+    {
+
+        if (!TryValidateLocations())
+
+        {
+
+            return;
+
+        }
+
+
+
+        scraping = true;
+
+        ClearMessages();
+
+        scrapeLoadingMessage =
+
+            $"Saving and scraping {locations.Count} location{(locations.Count == 1 ? "" : "s")}... This may take several minutes.";
+
+
+
+        try
+
+        {
+
+            var savedLocations = await PersistLocationsAsync();
+
+            scrapeLoadingMessage =
+
+                $"Scraping {savedLocations.Count} location{(savedLocations.Count == 1 ? "" : "s")}... This may take several minutes. Please wait.";
+
+
+
+            var job = await ScrapeApi.ScrapeAsync(savedLocations);
+
+            ApplyScrapeResult(job);
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            errorMessage = GetErrorMessage(ex);
+
+        }
+
+        finally
+
+        {
+
+            scraping = false;
+
+        }
+
+    }
+
+
+
+    private async Task<IReadOnlyList<string>> PersistLocationsAsync()
+
+    {
+
+        var updated = await LocationsApi.UpdateAsync(locations);
+
+        locations.Clear();
+
+        locations.AddRange(updated);
+
+        return updated;
+
+    }
+
+
+
+    private void ApplyScrapeResult(ScrapeJobResult job)
+
+    {
+
+        if (job.TotalSolicitorsFound > 0)
+
+        {
+
+            scrapeSuccessMessage =
+
+                $"Scrape finished. Found {job.TotalSolicitorsFound} solicitor contact{(job.TotalSolicitorsFound == 1 ? "" : "s")}.";
+
+            successMessage = scrapeSuccessMessage;
+
+        }
+
+        else
+
+        {
+
+            warningMessage = "Scrape finished but no solicitor contacts were found.";
+
+        }
+
+
+
+        if (job.FailedLocations.Count > 0)
+
+        {
+
+            warningMessage =
+
+                $"Some locations failed: {string.Join(", ", job.FailedLocations)}. " +
+
+                $"Successfully scraped {job.Locations.Count - job.FailedLocations.Count} of {job.Locations.Count} locations.";
+
+            scrapeSuccessMessage = null;
+
+            successMessage = null;
+
+        }
+
+
+
+        if (string.Equals(job.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+
+        {
+
+            errorMessage = job.ErrorMessage ?? "All locations failed to scrape.";
+
+            scrapeSuccessMessage = null;
+
+            successMessage = null;
+
+        }
+
+    }
+
+
+
+    private bool TryValidateLocations()
+
+    {
+
+        if (locations.Count > 0)
+
+        {
+
+            return true;
+
+        }
+
+
+
+        errorMessage = "At least one location is required.";
+
+        return false;
+
+    }
+
+
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+
+    {
+
+        if (args.Key == "Enter")
+
+        {
+
+            AddLocation();
+
+            await Task.CompletedTask;
+
+        }
+
+    }
+
+
+
+    private void ClearMessages()
+
+    {
+
+        errorMessage = null;
+
+        successMessage = null;
+
+        warningMessage = null;
+
+        scrapeSuccessMessage = null;
+
+    }
+
+
+
+    private static string GetErrorMessage(Exception ex) =>
+
+        ex switch
+
+        {
+
+            ApiException apiEx => apiEx.Message,
+
+            HttpRequestException => "Could not reach the API. Make sure InfoTrack.SolicitorScraper.Api is running on https://localhost:5001.",
+
+            _ => ex.Message
+
+        };
+
+}
+
