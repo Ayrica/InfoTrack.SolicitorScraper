@@ -15,6 +15,13 @@ public class UnitOfWork : IUnitOfWork
         Func<CancellationToken, Task> action,
         CancellationToken cancellationToken = default)
     {
+        // As InMemory provider doesn't support transactions, in this case SaveChanges is already atomic.
+        if (_dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            await action(cancellationToken);
+            return;
+        }
+
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         try
