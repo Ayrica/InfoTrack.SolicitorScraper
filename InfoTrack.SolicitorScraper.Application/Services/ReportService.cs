@@ -23,24 +23,25 @@ public class ReportService : IReportService
             configuredLocations,
             cancellationToken);
 
-        var byLocation = configuredLocations
+        var countByLocation = contacts
+            .GroupBy(c => c.Location, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        var locationCounts = configuredLocations
             .Select(location => new LocationCount
             {
                 Location = location,
-                Count = contacts.Count(c =>
-                    string.Equals(c.Location, location, StringComparison.OrdinalIgnoreCase))
+                Count = countByLocation.TryGetValue(location, out var count) ? count : 0
             })
+            .ToList();
+
+        var byLocation = locationCounts
             .OrderByDescending(x => x.Count)
             .ToList();
 
-        var coverageGaps = configuredLocations
-            .Select(location =>
-            {
-                var count = contacts.Count(c =>
-                    string.Equals(c.Location, location, StringComparison.OrdinalIgnoreCase));
-                return new LocationCoverage { Location = location, Count = count };
-            })
-            .Where(x => !x.HasResults)
+        var coverageGaps = locationCounts
+            .Where(x => x.Count == 0)
+            .Select(x => new LocationCoverage { Location = x.Location, Count = x.Count })
             .ToList();
 
         var topByReview = contacts

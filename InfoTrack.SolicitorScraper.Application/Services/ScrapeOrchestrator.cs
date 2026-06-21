@@ -8,17 +8,20 @@ public class ScrapeOrchestrator : IScrapeOrchestrator
 {
     private readonly ISolicitorScraper _scraper;
     private readonly ISolicitorRepository _solicitorRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILocationSettingsService _locationSettingsService;
     private readonly ILogger<ScrapeOrchestrator> _logger;
 
     public ScrapeOrchestrator(
         ISolicitorScraper scraper,
         ISolicitorRepository solicitorRepository,
+        IUnitOfWork unitOfWork,
         ILocationSettingsService locationSettingsService,
         ILogger<ScrapeOrchestrator> logger)
     {
         _scraper = scraper;
         _solicitorRepository = solicitorRepository;
+        _unitOfWork = unitOfWork;
         _locationSettingsService = locationSettingsService;
         _logger = logger;
     }
@@ -53,7 +56,11 @@ public class ScrapeOrchestrator : IScrapeOrchestrator
             {
                 _logger.LogInformation("Scraping solicitors for {Location}", location);
                 var contacts = await _scraper.ScrapeLocationAsync(location, cancellationToken);
-                await _solicitorRepository.ReplaceForLocationAsync(location, contacts, cancellationToken);
+
+                await _unitOfWork.ExecuteInTransactionAsync(
+                    ct => _solicitorRepository.ReplaceForLocationAsync(location, contacts, ct),
+                    cancellationToken);
+
                 totalFound += contacts.Count;
             }
             catch (Exception ex)

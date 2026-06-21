@@ -1,11 +1,14 @@
 using InfoTrack.SolicitorScraper.Infrastructure.Scraping;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace InfoTrack.SolicitorScraper.Tests;
 
 public class SolicitorsHtmlParserTests
 {
-    private readonly SolicitorsHtmlParser _parser = new(NullLogger<SolicitorsHtmlParser>.Instance);
+    private readonly SolicitorsHtmlParser _parser = new(
+        NullLogger<SolicitorsHtmlParser>.Instance,
+        Options.Create(new ScrapingOptions()));
 
     [Fact]
     public void Parse_ExtractsContactDetailsFromResultSection()

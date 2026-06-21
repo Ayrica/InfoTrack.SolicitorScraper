@@ -22,7 +22,7 @@ public class SolicitorsPageClient
     public async Task<string> FetchLocationPageAsync(string location, CancellationToken cancellationToken = default)
     {
         var slug = NormalizeLocationSlug(location);
-        var url = _options.BaseUrlTemplate.Replace("{location}", slug, StringComparison.OrdinalIgnoreCase);
+        var url = _options.TemplateBaseUrl.Replace("{location}", slug, StringComparison.OrdinalIgnoreCase);
         return await FetchPageAsync(url, cancellationToken);
     }
 

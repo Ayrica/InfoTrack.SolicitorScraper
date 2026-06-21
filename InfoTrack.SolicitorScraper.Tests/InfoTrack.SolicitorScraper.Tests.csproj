@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\InfoTrack.SolicitorScraper.Api\InfoTrack.SolicitorScraper.Api.csproj" />
+    <ProjectReference Include="..\InfoTrack.SolicitorScraper.Application\InfoTrack.SolicitorScraper.Application.csproj" />
     <ProjectReference Include="..\InfoTrack.SolicitorScraper.Infrastructure\InfoTrack.SolicitorScraper.Infrastructure.csproj" />
   </ItemGroup>
 

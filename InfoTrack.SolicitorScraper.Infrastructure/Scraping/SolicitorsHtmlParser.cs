@@ -2,16 +2,21 @@ using System.Net;
 using System.Text.RegularExpressions;
 using InfoTrack.SolicitorScraper.Core.Entities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace InfoTrack.SolicitorScraper.Infrastructure.Scraping;
 
 public partial class SolicitorsHtmlParser
 {
     private readonly ILogger<SolicitorsHtmlParser> _logger;
+    private readonly string _siteBaseUrl;
 
-    public SolicitorsHtmlParser(ILogger<SolicitorsHtmlParser> logger)
+    public SolicitorsHtmlParser(
+        ILogger<SolicitorsHtmlParser> logger,
+        IOptions<ScrapingOptions> options)
     {
         _logger = logger;
+        _siteBaseUrl = options.Value.SiteBaseUrl.TrimEnd('/');
     }
 
     public IReadOnlyList<SolicitorContact> Parse(string html, string location)
@@ -85,7 +90,7 @@ public partial class SolicitorsHtmlParser
         return blocks;
     }
 
-    private static SolicitorContact? ParseResultItem(string block, string location)
+    private SolicitorContact? ParseResultItem(string block, string location)
     {
         var name = ExtractName(block);
         if (string.IsNullOrWhiteSpace(name))
@@ -168,7 +173,7 @@ public partial class SolicitorsHtmlParser
             : match.Groups[2].Value.Trim();
     }
 
-    private static string? ExtractProfileEmailUrl(string html)
+    private string? ExtractProfileEmailUrl(string html)
     {
         var match = ProfileEmailPattern().Match(html);
         if (!match.Success)
@@ -176,13 +181,10 @@ public partial class SolicitorsHtmlParser
             return null;
         }
 
-        var path = match.Groups[1].Value.Trim();
-        return path.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-            ? path
-            : $"https://www.solicitors.com{path}";
+        return ResolveAbsoluteUrl(match.Groups[1].Value.Trim());
     }
 
-    private static string? ExtractEmailUrl(string block)
+    private string? ExtractEmailUrl(string block)
     {
         var match = EmailPattern().Match(block);
         if (!match.Success)
@@ -190,13 +192,10 @@ public partial class SolicitorsHtmlParser
             return null;
         }
 
-        var path = match.Groups[1].Value.Trim();
-        return path.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-            ? path
-            : $"https://www.solicitors.com{path}";
+        return ResolveAbsoluteUrl(match.Groups[1].Value.Trim());
     }
 
-    private static string? ExtractProfileUrl(string block)
+    private string? ExtractProfileUrl(string block)
     {
         var match = ProfilePattern().Match(block);
         if (!match.Success)
@@ -205,11 +204,13 @@ public partial class SolicitorsHtmlParser
         }
 
         var path = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
-        path = path.Trim();
-        return path.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-            ? path
-            : $"https://www.solicitors.com{path}";
+        return ResolveAbsoluteUrl(path.Trim());
     }
+
+    private string ResolveAbsoluteUrl(string path) =>
+        path.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? path
+            : $"{_siteBaseUrl}{path}";
 
     private static int? ExtractReviewCount(string block)
     {

@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddSingleton<SolicitorsHtmlParser>();
         services.AddScoped<ISolicitorScraper, Scraping.SolicitorScraper>();
         services.AddScoped<ISolicitorRepository, SolicitorRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<ILocationSettingsService, LocationSettingsService>();
 
         services.AddApplication();
